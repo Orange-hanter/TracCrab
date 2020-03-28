@@ -39,7 +39,12 @@ void updateChannel()
     bool Mode_2ws  = digitalRead(DI_MODE_2WS),
          Mode_4ws  = digitalRead(DI_MODE_4WS),
          Mode_crab = digitalRead(DI_MODE_CRAB);
-
+   /* Serial.print( Mode_2ws );
+    Serial.print("\t");
+    Serial.print( Mode_4ws );
+    Serial.print("\t");
+    Serial.print( Mode_crab );
+    Serial.print("\n"); */
     if ( ( (Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0 ) &&  controll_state != Controll_state::NO )
     {
       controll_state = Controll_state::NO;
@@ -63,7 +68,6 @@ void updateChannel()
 
 void setup()
 {
-
   PTR_RFront = new RingBuffer<float>();
   PTR_RBack  = new RingBuffer<float>();
   //PTR_LFront = new RingBuffer<float>();
@@ -105,6 +109,8 @@ void loop()
     PTR_RBack->update( analogRead(PIN_PTR_RBack));
     //PTR_RFront->update(analogRead(PIN_PTR_RFront));
     //PTR_LBack->update(analogRead(PIN_PTR_LBack));
+    PTR_RFront->check(); //TODO: Доделать проверку изменения значений по реально меняющимся данным (сейчас проверка по времени)
+    PTR_RBack->check();
     time_to_update_PTRs = millis();
   }
 
@@ -119,27 +125,51 @@ void loop()
     switch (controll_state)
     {
     case Controll_state::STATE_2WS:
-      //analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
-      //analogWrite(PIN_DRIVER_POWER_CH2, 255/2); // в режиме 2ws фиксируем колёса прямо 
+      analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
+      analogWrite(PIN_DRIVER_POWER_CH2, 255/2); // в режиме 2ws фиксируем колёса прямо 
       break;
 
     case Controll_state::STATE_4WS:
-      //analogWrite(PIN_DRIVER_POWER_CH1, task);
+      long delta = (-1.f) * ( PTR_RFront->getAverage() - (1023.f/2.f) );
+      short sign = 1;
+      if (delta >= 0)
+        task = map( delta, 0, 1023, 0, 255);
+      else
+      {
+        task = map( (-1)*delta, 0, 1023, 0, 255);
+        sign = -1;
+      }
+      
+      task = task > 192 ? 192 : task;
+      task = task < 64 ? 64 : task;
+      analogWrite(PIN_DRIVER_POWER_CH1, 255/2 + (sign * task) );
       break;
 
     case Controll_state::STATE_CRAB:
-      //analogWrite(PIN_DRIVER_POWER_CH1, task);
-      //analogWrite(PIN_DRIVER_POWER_CH2, task);
+      long delta = ( PTR_RFront->getAverage() - (1023.f/2.f) );
+      short sign = 1;
+      if (delta >= 0)
+        task = map( delta, 0, 1023, 0, 255);
+      else
+      {
+        task = map( (-1)*delta, 0, 1023, 0, 255);
+        sign = -1;
+      }
+      
+      task = task > 192 ? 192 : task;
+      task = task < 64 ? 64 : task;
+      analogWrite(PIN_DRIVER_POWER_CH1, 255/2 + (sign * task) );
       break;
 
     case Controll_state::NO:
-      //analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
-      //analogWrite(PIN_DRIVER_POWER_CH2, 255/2);
+      //TODO: Discuss behaviour in this case
       break;
     
     default:
       break;
     }
+
+    time_to_update_logic = millis();
   }
 
 #ifdef monitor
