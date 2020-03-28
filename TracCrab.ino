@@ -1,4 +1,127 @@
 #include <Arduino.h>
+#line 1 "c:\\Users\\Danil\\OneDrive\\Documents\\AGROM\\Trac_Crab\\RingBuffer.hpp"
+#define SAMPLES 10
+template <typename T>
+class RingBuffer
+{
+private:
+  volatile T data[SAMPLES];
+  volatile T avaragedData[SAMPLES];
+  volatile T prevValue;
+  volatile T prevSample;
+  short pos;
+  short posForAvarage;
+
+public:
+  RingBuffer()
+  {
+    for (size_t i = 0; i < SAMPLES; ++i)
+      data[i] = 0;
+    for (size_t i = 0; i < SAMPLES; ++i)
+      avaragedData[i] = 0;
+    pos = 0;
+    posForAvarage = 0;
+    prevValue = 0;
+  };
+
+  ~RingBuffer(){};
+
+  void update(T value)
+  {
+    data[(pos + 1) % SAMPLES] = value;
+    pos = ++pos % SAMPLES;
+    if (pos == 0)
+    {
+      avaragedData[(posForAvarage + 1) % SAMPLES] = getAverage();
+      posForAvarage = (posForAvarage + 1) % SAMPLES;
+    }
+  };
+
+  void update(/*time in micros*/)
+  {
+    short next_pos = (pos + 1) % SAMPLES;
+    data[next_pos] = micros() - prevValue;
+    prevValue = micros();
+    pos = next_pos;
+    if (pos == 0)
+    {
+      avaragedData[(posForAvarage + 1) % SAMPLES] = getAverage();
+      posForAvarage = (posForAvarage + 1) % SAMPLES;
+    }
+
+    /*  Serial.print(data[0]);
+    Serial.print(" ");
+    Serial.print(data[1]);
+    Serial.print(" ");
+    Serial.print(data[2]);
+    Serial.print(" ");
+    Serial.print(data[3]);
+    Serial.print(" ");
+    Serial.print(data[4]);
+    Serial.println();*/
+  }
+
+  T getAverage()
+  {
+    float summ{0};
+    for (size_t i = 0; i < SAMPLES; ++i)
+      summ += data[i];
+    return summ / float(SAMPLES);
+  };
+
+  T getMid()
+  {
+    T newData[SAMPLES];
+
+    for (size_t i = 0; i < SAMPLES; ++i)
+      newData[i] += avaragedData[i];
+
+    for (size_t i = 0; i < SAMPLES; i++)
+    {
+      size_t buf = i;
+      for (size_t j = i; j < SAMPLES; j++)
+      {
+        if (data[buf] > data[j])
+          buf = j;
+      }
+      if (buf != i)
+      {
+        T tmp = data[i];
+        data[i] = data[buf];
+        data[buf] = tmp;
+      }
+    }
+    
+    if( newData[SAMPLES / 2] < (prevSample * 1.7) )
+    {
+      prevSample = newData[SAMPLES / 2];
+      return prevSample;
+    }
+    else
+       return prevSample;
+  };
+
+  void check()
+  {
+    bool tooLong = (micros() - this->prevValue) > 5000000; //TODO confirm that this value (time between signals) not to big or small
+    if (tooLong)
+      for (size_t i = 0; i < 5; i++)
+        data[i] = 0;
+  }
+};
+
+class RPMMetr : public RingBuffer<long>
+{
+public:
+  float getRPM(int COUNT_OF_BLADES = 1)
+  {
+    float calc = (this->getMid() * COUNT_OF_BLADES);
+    return calc == 0 ? 0 : (60000000.f / calc); //TODO aproof math of calculation RPM
+  }
+};
+
+#line 1 "c:\\Users\\Danil\\OneDrive\\Documents\\AGROM\\Trac_Crab\\Trac_crab.ino"
+#include <Arduino.h>
 #include "RingBuffer.hpp"
 #include "config.h"
 
@@ -40,7 +163,7 @@ void updateChannel()
          Mode_4ws  = digitalRead(DI_MODE_4WS),
          Mode_crab = digitalRead(DI_MODE_CRAB);
 
-    if ( ( (Mode_2ws + Mode_4ws + Mode_crab) > 1 ) &&  controll_state != Controll_state::NO )
+    if ( ( (Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0 ) &&  controll_state != Controll_state::NO )
     {
       controll_state = Controll_state::NO;
     }
@@ -113,28 +236,28 @@ void loop()
   --------------------------------------------------------------------------------------------------*/
   // analogRead values go from 0 to 1023, analogWrite values from 0 to 255
 
-  if (millis() - time_to_update_PTRs > 50)
+  if (millis() - time_to_update_logic > 150)
   {
    
     switch (controll_state)
     {
     case Controll_state::STATE_2WS:
-      analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
-      analogWrite(PIN_DRIVER_POWER_CH2, 255/2); // в режиме 2ws фиксируем колёса прямо 
+      //analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
+      //analogWrite(PIN_DRIVER_POWER_CH2, 255/2); // в режиме 2ws фиксируем колёса прямо 
       break;
 
     case Controll_state::STATE_4WS:
-      analogWrite(PIN_DRIVER_POWER_CH1, task);
+      //analogWrite(PIN_DRIVER_POWER_CH1, task);
       break;
 
     case Controll_state::STATE_CRAB:
-      analogWrite(PIN_DRIVER_POWER_CH1, task);
-      analogWrite(PIN_DRIVER_POWER_CH2, task);
+      //analogWrite(PIN_DRIVER_POWER_CH1, task);
+      //analogWrite(PIN_DRIVER_POWER_CH2, task);
       break;
 
     case Controll_state::NO:
-      analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
-      analogWrite(PIN_DRIVER_POWER_CH2, 255/2);
+      //analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
+      //analogWrite(PIN_DRIVER_POWER_CH2, 255/2);
       break;
     
     default:
@@ -145,7 +268,7 @@ void loop()
 #ifdef monitor
   if (millis() - time_to_print > 40)
   {
-    Serial.print("RFront(%):\tRBack(%):\n");
+    Serial.print("RFront(%):\tRBack(%):\tMode:\n");
     Serial.print(PTR_RFront->getAverage());
     Serial.print("\t");
     Serial.print(PTR_RBack->getAverage());
@@ -154,18 +277,23 @@ void loop()
     switch (controll_state)
     {
     case Controll_state::STATE_2WS:
-      /* code */
+      Serial.print(100);
+      Serial.print("\t");
       break;
 
     case Controll_state::STATE_4WS:
-      /* code */
+      Serial.print(200);
+      Serial.print("\t");
       break;
 
     case Controll_state::STATE_CRAB:
-      /* code */
+      Serial.print(300);
+      Serial.print("\t");
       break;
 
     case Controll_state::NO:
+      Serial.print(0);
+      Serial.print("\t");
       Serial.print("No one mode used! Check Cabel");
       break;
     

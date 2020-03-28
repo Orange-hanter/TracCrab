@@ -21,9 +21,9 @@
     A4 - режим 4ws  (Digital Input)
     A3 - режим crab (Digital Input)
 
-    A2 - потенциометр 1 TODO: Добавить описание где какой потенциометр
-    A1 - потенциометр 2
-    A0 - потенциометр 3
+    A2 - нет 
+    A1 - потенциометр 2 правое колесо здади
+    A0 - потенциометр 1 правое колесо спереди
 
 Распиновка колёс:
     LFront          RFront
@@ -34,9 +34,9 @@
 */
 
 #define PIN_PTR_RFront  A0
-#define PIN_PTR_LFront  A1
-#define PIN_PTR_RBack   A2
-#define PIN_PTR_LBack   NULL
+#define PIN_PTR_RBack   A1
+//#define PIN_PTR_LFront  A2
+//#define PIN_PTR_LBack   NULL
 
 #define DI_MODE_2WS  A5
 #define DI_MODE_4WS  A4
@@ -51,5 +51,6 @@
 volatile long time_to_print = 0;
 volatile long time_to_update_PTRs = 0;
 volatile long time_to_update_channel = 0;
+volatile long time_to_update_logic = 0;
 
 const float voltageMultiplyer = 5.0/1023.0;
