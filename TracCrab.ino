@@ -74,6 +74,9 @@ void setup()
   pinMode(PIN_PTR_RFront, INPUT_PULLUP);
   pinMode(PIN_PTR_RBack, INPUT_PULLUP);
 
+  pinMode(PIN_PTR_RFront, INPUT_PULLUP);
+  pinMode(PIN_PTR_RBack, INPUT_PULLUP);
+
   //select direction for the first channel
   pinMode(PIN_DRIVER_DIR_CH1, OUTPUT);
   digitalWrite(PIN_DRIVER_DIR_CH1, HIGH);
