@@ -49,15 +49,15 @@ void updateChannel()
     {
       controll_state = Controll_state::NO;
     }
-    else  if ( Mode_2ws && controll_state != Controll_state::STATE_2WS )
+    else  if ( Mode_2ws && !Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_2WS )
     {
       controll_state = Controll_state::STATE_2WS;
     }
-    else  if ( Mode_4ws && controll_state != Controll_state::STATE_4WS )
+    else  if ( !Mode_2ws && Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_4WS )
     {
       controll_state = Controll_state::STATE_4WS;
     }
-    else  if ( Mode_crab && controll_state != Controll_state::STATE_CRAB )
+    else  if ( !Mode_2ws && !Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_CRAB )
     {
       controll_state = Controll_state::STATE_CRAB;
     }
@@ -121,17 +121,18 @@ void loop()
 
   if (millis() - time_to_update_logic > 150)
   {
-   
+   long delta = 0;
+   short sign = 1;
     switch (controll_state)
     {
     case Controll_state::STATE_2WS:
       analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
       analogWrite(PIN_DRIVER_POWER_CH2, 255/2); // в режиме 2ws фиксируем колёса прямо 
       break;
-
+      
     case Controll_state::STATE_4WS:
-      long delta = (-1.f) * ( PTR_RFront->getAverage() - (1023.f/2.f) );
-      short sign = 1;
+      delta = (-1.f) * ( PTR_RFront->getAverage() - (1023.f/2.f) );
+      sign = 1;
       if (delta >= 0)
         task = map( delta, 0, 1023, 0, 255);
       else
@@ -143,11 +144,12 @@ void loop()
       task = task > 192 ? 192 : task;
       task = task < 64 ? 64 : task;
       analogWrite(PIN_DRIVER_POWER_CH1, 255/2 + (sign * task) );
+      analogWrite(PIN_DRIVER_POWER_CH2, 255/2 + (sign * task) );
       break;
 
     case Controll_state::STATE_CRAB:
-      long delta = ( PTR_RFront->getAverage() - (1023.f/2.f) );
-      short sign = 1;
+      delta = ( PTR_RFront->getAverage() - (1023.f/2.f) );
+      sign = 1;
       if (delta >= 0)
         task = map( delta, 0, 1023, 0, 255);
       else
@@ -159,6 +161,7 @@ void loop()
       task = task > 192 ? 192 : task;
       task = task < 64 ? 64 : task;
       analogWrite(PIN_DRIVER_POWER_CH1, 255/2 + (sign * task) );
+      analogWrite(PIN_DRIVER_POWER_CH2, 255/2 + (sign * task) );
       break;
 
     case Controll_state::NO:
