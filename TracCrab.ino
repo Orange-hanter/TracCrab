@@ -2,7 +2,7 @@
 #include "RingBuffer.hpp"
 #include "config.h"
 
-#define monitor //turn on monitoring via USB
+#define monitor5 //turn on monitoring via USB
 
 enum Controll_state
 {
@@ -14,8 +14,6 @@ enum Controll_state
 
 RingBuffer<float> *PTR_RFront;
 RingBuffer<float> *PTR_RBack;
-//RingBuffer<float> *PTR_LFront;
-//RingBuffer<float> *PTR_LBack;
 
 short task;
 
@@ -39,25 +37,27 @@ void updateChannel()
     bool Mode_2ws  = digitalRead(DI_MODE_2WS),
          Mode_4ws  = digitalRead(DI_MODE_4WS),
          Mode_crab = digitalRead(DI_MODE_CRAB);
-   /* Serial.print( Mode_2ws );
-    Serial.print("\t");
-    Serial.print( Mode_4ws );
-    Serial.print("\t");
-    Serial.print( Mode_crab );
-    Serial.print("\n"); */
+   
+    // Serial.print( Mode_2ws );
+    // Serial.print("\t");
+    // Serial.print( Mode_4ws );
+    // Serial.print("\t");
+    // Serial.print( Mode_crab );
+    // Serial.print("\n"); 
+   
     if ( ( (Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0 ) &&  controll_state != Controll_state::NO )
     {
       controll_state = Controll_state::NO;
     }
-    else  if ( Mode_2ws && !Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_2WS )
+    else  if ( !Mode_2ws && Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_2WS )
     {
       controll_state = Controll_state::STATE_2WS;
     }
-    else  if ( !Mode_2ws && Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_4WS )
+    else  if ( Mode_2ws && !Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_4WS )
     {
       controll_state = Controll_state::STATE_4WS;
     }
-    else  if ( !Mode_2ws && !Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_CRAB )
+    else  if ( Mode_2ws && Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_CRAB )
     {
       controll_state = Controll_state::STATE_CRAB;
     }
@@ -70,8 +70,9 @@ void setup()
 {
   PTR_RFront = new RingBuffer<float>();
   PTR_RBack  = new RingBuffer<float>();
-  //PTR_LFront = new RingBuffer<float>();
-  //PTR_LBack  = new RingBuffer();
+
+  pinMode(PIN_PTR_RFront, INPUT_PULLUP);
+  pinMode(PIN_PTR_RBack, INPUT_PULLUP);
 
   //select direction for the first channel
   pinMode(PIN_DRIVER_DIR_CH1, OUTPUT);
@@ -107,29 +108,44 @@ void loop()
   {
     PTR_RFront->update( analogRead(PIN_PTR_RFront) );
     PTR_RBack->update( analogRead(PIN_PTR_RBack) );
-    //PTR_RFront->update(analogRead(PIN_PTR_RFront));
-    //PTR_LBack->update(analogRead(PIN_PTR_LBack));
+
     time_to_update_PTRs = millis();
   }
 
   /*--------------------------------------------------------------------------------------------------
     BUISNESS LOGIC
+      analogRead values go from 0 to 1023, analogWrite values from 0 to 255
   --------------------------------------------------------------------------------------------------*/
-  // analogRead values go from 0 to 1023, analogWrite values from 0 to 255
 
-  if (millis() - time_to_update_logic > 150)
+  if (millis() - time_to_update_logic > 150 )
   {
-   long delta = 0;
-   short sign = 1;
+    long delta = 0;
+    short sign = 1;
+    float sourceVal = PTR_RFront->getAverage() / 1023.f * 100,
+          ctrlVal   = PTR_RBack->getAverage()  / 1023.f * 100;
+
     switch (controll_state)
     {
     case Controll_state::STATE_2WS:
-      analogWrite(PIN_DRIVER_POWER_CH1, 255/2);
-      analogWrite(PIN_DRIVER_POWER_CH2, 255/2); // в режиме 2ws фиксируем колёса прямо 
+      delta = ctrlVal - zeroRBack;
+      if(delta > 0)
+        sign = -1;
+        
+      if ( abs(delta) < 5)
+      {
+        task = 127;
+        break;
+      }
+      else if( abs(delta) < 20 )      
+        task = 127 + 32 * sign;
+      else if ( abs(delta) > 20 )
+        task = 127 + 64 * sign;
+      analogWrite(PIN_DRIVER_POWER_CH1, task);
+      analogWrite(PIN_DRIVER_POWER_CH2, task);
       break;
       
     case Controll_state::STATE_4WS:
-      delta = (-1.f) * ( PTR_RFront->getAverage() - (1023.f/2.f) );
+      delta = (-1.f) * ( sourceVal - (1023.f/2.f) );
       sign = 1;
       if (delta >= 0)
         task = map( delta, 0, 1023, 0, 255);
@@ -146,7 +162,7 @@ void loop()
       break;
 
     case Controll_state::STATE_CRAB:
-      delta = ( PTR_RFront->getAverage() - (1023.f/2.f) );
+      delta = ( sourceVal - (1023.f/2.f) );
       sign = 1;
       if (delta >= 0)
         task = map( delta, 0, 1023, 0, 255);
