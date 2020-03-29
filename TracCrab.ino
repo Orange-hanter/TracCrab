@@ -105,12 +105,10 @@ void loop()
   //обновляем значение на потенциометрах каждые 50мс
   if (millis() - time_to_update_PTRs > 50)
   {
-    PTR_RFront->update( analogRead(PIN_PTR_RFront));
-    PTR_RBack->update( analogRead(PIN_PTR_RBack));
+    PTR_RFront->update( analogRead(PIN_PTR_RFront) );
+    PTR_RBack->update( analogRead(PIN_PTR_RBack) );
     //PTR_RFront->update(analogRead(PIN_PTR_RFront));
     //PTR_LBack->update(analogRead(PIN_PTR_LBack));
-    PTR_RFront->check(); //TODO: Доделать проверку изменения значений по реально меняющимся данным (сейчас проверка по времени)
-    PTR_RBack->check();
     time_to_update_PTRs = millis();
   }
 
