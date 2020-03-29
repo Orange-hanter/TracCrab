@@ -39,12 +39,14 @@ void updateChannel()
     bool Mode_2ws  = digitalRead(DI_MODE_2WS),
          Mode_4ws  = digitalRead(DI_MODE_4WS),
          Mode_crab = digitalRead(DI_MODE_CRAB);
+   
    /* Serial.print( Mode_2ws );
     Serial.print("\t");
     Serial.print( Mode_4ws );
     Serial.print("\t");
     Serial.print( Mode_crab );
     Serial.print("\n"); */
+   
     if ( ( (Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0 ) &&  controll_state != Controll_state::NO )
     {
       controll_state = Controll_state::NO;
@@ -72,6 +74,9 @@ void setup()
   PTR_RBack  = new RingBuffer<float>();
   //PTR_LFront = new RingBuffer<float>();
   //PTR_LBack  = new RingBuffer();
+
+  pinMode(PIN_PTR_RFront, INPUT_PULLUP);
+  pinMode(PIN_PTR_RBack, INPUT_PULLUP);
 
   //select direction for the first channel
   pinMode(PIN_DRIVER_DIR_CH1, OUTPUT);
