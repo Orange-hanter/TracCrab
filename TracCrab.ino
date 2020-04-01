@@ -2,7 +2,7 @@
 #include "RingBuffer.hpp"
 #include "config.h"
 
-#define monitor5 //turn on monitoring via USB
+#define monitor //turn on monitoring via USB
 
 enum Controll_state
 {
@@ -29,35 +29,44 @@ float fmap(float x, float in_min, float in_max, float out_min, float out_max)
   return result;
 }
 
+short getTask(short persent)
+{
+  persent = persent > 100 ? 100 : persent;
+  persent = persent < 0 ? 0 : persent;
+
+  short task = 255.f * (float)persent / 100.f;
+  return task;
+}
+
 //обновляем значение рычага режимов каждые 200мс
 void updateChannel()
 {
   if (millis() - time_to_update_channel > 200)
   {
-    bool Mode_2ws  = digitalRead(DI_MODE_2WS),
-         Mode_4ws  = digitalRead(DI_MODE_4WS),
+    bool Mode_2ws = digitalRead(DI_MODE_2WS),
+         Mode_4ws = digitalRead(DI_MODE_4WS),
          Mode_crab = digitalRead(DI_MODE_CRAB);
-   
+
     // Serial.print( Mode_2ws );
     // Serial.print("\t");
     // Serial.print( Mode_4ws );
     // Serial.print("\t");
     // Serial.print( Mode_crab );
-    // Serial.print("\n"); 
-   
-    if ( ( (Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0 ) &&  controll_state != Controll_state::NO )
+    // Serial.print("\n");
+
+    if (((Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0) && controll_state != Controll_state::NO)
     {
       controll_state = Controll_state::NO;
     }
-    else  if ( !Mode_2ws && Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_2WS )
+    else if (!Mode_2ws && Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_2WS)
     {
       controll_state = Controll_state::STATE_2WS;
     }
-    else  if ( Mode_2ws && !Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_4WS )
+    else if (Mode_2ws && !Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_4WS)
     {
       controll_state = Controll_state::STATE_4WS;
     }
-    else  if ( Mode_2ws && Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_CRAB )
+    else if (Mode_2ws && Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_CRAB)
     {
       controll_state = Controll_state::STATE_CRAB;
     }
@@ -69,7 +78,7 @@ void updateChannel()
 void setup()
 {
   PTR_RFront = new RingBuffer<float>();
-  PTR_RBack  = new RingBuffer<float>();
+  PTR_RBack = new RingBuffer<float>();
 
   pinMode(PIN_PTR_RFront, INPUT_PULLUP);
   pinMode(PIN_PTR_RBack, INPUT_PULLUP);
@@ -88,8 +97,8 @@ void setup()
   pinMode(PIN_DRIVER_POWER_CH2, OUTPUT);
 
   //set init value of power equal 50%
-  analogWrite( PIN_DRIVER_POWER_CH1, 255/2 ); 
-  analogWrite( PIN_DRIVER_POWER_CH2, 255/2 );
+  analogWrite(PIN_DRIVER_POWER_CH1, getTask(zeroValuePWM));
+  analogWrite(PIN_DRIVER_POWER_CH2, getTask(zeroValuePWM));
 
   pinMode(DI_MODE_2WS, INPUT);
   pinMode(DI_MODE_4WS, INPUT);
@@ -109,8 +118,8 @@ void loop()
   //обновляем значение на потенциометрах каждые 50мс
   if (millis() - time_to_update_PTRs > 50)
   {
-    PTR_RFront->update( analogRead(PIN_PTR_RFront) );
-    PTR_RBack->update( analogRead(PIN_PTR_RBack) );
+    PTR_RFront->update(analogRead(PIN_PTR_RFront));
+    PTR_RBack->update(analogRead(PIN_PTR_RBack));
 
     time_to_update_PTRs = millis();
   }
@@ -120,73 +129,58 @@ void loop()
       analogRead values go from 0 to 1023, analogWrite values from 0 to 255
   --------------------------------------------------------------------------------------------------*/
 
-  if (millis() - time_to_update_logic > 150 )
+  if (millis() - time_to_update_logic > 150)
   {
     long delta = 0;
     short sign = 1;
     float sourceVal = PTR_RFront->getAverage() / 1023.f * 100,
-          ctrlVal   = PTR_RBack->getAverage()  / 1023.f * 100;
+            ctrlVal = PTR_RBack->getAverage() / 1023.f * 100;
 
-    switch (controll_state)
-    {
-    case Controll_state::STATE_2WS:
-      delta = ctrlVal - zeroRBack;
-      if(delta > 0)
-        sign = -1;
-        
-      if ( abs(delta) < 5)
-      {
-        task = 127;
+    switch (controll_state)    {
+
+      case Controll_state::STATE_2WS:
+        delta = ctrlVal - zeroRBack;
+        if (delta > 0)
+          sign = -1;
+
+        if (abs(delta) < 5)
+        {
+          task = zeroValuePWM;
+          break;
+        }
+        else if (abs(delta) < 20)
+          task = getTask( zeroValuePWM + 12.5 * sign );
+        else if (abs(delta) > 20)
+          task = getTask( zeroValuePWM + 25 * sign );
+
+        analogWrite(PIN_DRIVER_POWER_CH1, task);
+        analogWrite(PIN_DRIVER_POWER_CH2, task);
         break;
-      }
-      else if( abs(delta) < 20 )      
-        task = 127 + 32 * sign;
-      else if ( abs(delta) > 20 )
-        task = 127 + 64 * sign;
-      analogWrite(PIN_DRIVER_POWER_CH1, task);
-      analogWrite(PIN_DRIVER_POWER_CH2, task);
-      break;
-      
-    case Controll_state::STATE_4WS:
-      delta = (-1.f) * ( sourceVal - (1023.f/2.f) );
-      sign = 1;
-      if (delta >= 0)
-        task = map( delta, 0, 1023, 0, 255);
-      else
-      {
-        task = map( (-1)*delta, 0, 1023, 0, 255);
-        sign = -1;
-      }
-      
-      task = task > 192 ? 192 : task;
-      task = task < 64 ? 64 : task;
-      analogWrite(PIN_DRIVER_POWER_CH1, 255/2 + (sign * task) );
-      analogWrite(PIN_DRIVER_POWER_CH2, 255/2 + (sign * task) );
-      break;
 
-    case Controll_state::STATE_CRAB:
-      delta = ( sourceVal - (1023.f/2.f) );
-      sign = 1;
-      if (delta >= 0)
-        task = map( delta, 0, 1023, 0, 255);
-      else
-      {
-        task = map( (-1)*delta, 0, 1023, 0, 255);
-        sign = -1;
-      }
-      
-      task = task > 192 ? 192 : task;
-      task = task < 64 ? 64 : task;
-      analogWrite(PIN_DRIVER_POWER_CH1, 255/2 + (sign * task) );
-      analogWrite(PIN_DRIVER_POWER_CH2, 255/2 + (sign * task) );
-      break;
+      case Controll_state::STATE_4WS:
+        //code
+        task = getTask(zeroValuePWM);
+        task = task > getTask(maxValuePWM) ? getTask(maxValuePWM) : task;
+        task = task < getTask(minValuePWM) ? getTask(minValuePWM) : task;
+        analogWrite(PIN_DRIVER_POWER_CH1, task);
+        analogWrite(PIN_DRIVER_POWER_CH2, task);
+        break;
 
-    case Controll_state::NO:
-      //TODO: Discuss behaviour in this case
-      break;
-    
-    default:
-      break;
+      case Controll_state::STATE_CRAB:
+        //code
+        task = getTask(zeroValuePWM);
+        task = task > getTask(maxValuePWM) ? getTask(maxValuePWM) : task;
+        task = task < getTask(minValuePWM) ? getTask(minValuePWM) : task;
+        analogWrite(PIN_DRIVER_POWER_CH1, task);
+        analogWrite(PIN_DRIVER_POWER_CH2, task);
+        break;
+
+      case Controll_state::NO:
+        //TODO: Discuss behaviour in this case
+        break;
+
+      default:
+        break;
     }
 
     time_to_update_logic = millis();
@@ -196,25 +190,25 @@ void loop()
   if (millis() - time_to_print > 40)
   {
     Serial.print("RFront(%):\tRBack(%):\tMode:\n");
-    Serial.print(PTR_RFront->getAverage());
+    Serial.print(PTR_RFront->getAverage() / 1023.f * 100.f);
     Serial.print("\t");
-    Serial.print(PTR_RBack->getAverage());
+    Serial.print(PTR_RBack->getAverage()  / 1023.f * 100.f);
     Serial.print("\t");
 
     switch (controll_state)
     {
     case Controll_state::STATE_2WS:
-      Serial.print(100);
+      Serial.print(10);
       Serial.print("\t");
       break;
 
     case Controll_state::STATE_4WS:
-      Serial.print(200);
+      Serial.print(20);
       Serial.print("\t");
       break;
 
     case Controll_state::STATE_CRAB:
-      Serial.print(300);
+      Serial.print(30);
       Serial.print("\t");
       break;
 
@@ -223,7 +217,7 @@ void loop()
       Serial.print("\t");
       Serial.print("No one mode used! Check Cabel");
       break;
-    
+
     default:
       break;
     }
