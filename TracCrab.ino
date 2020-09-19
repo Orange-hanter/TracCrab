@@ -1,42 +1,11 @@
 #include <Arduino.h>
 #include "RingBuffer.hpp"
-#include "config.h"
+#include "tools.hpp"
 
 #define monitor //turn on monitoring via USB
 
-enum Controll_state
-{
-  STATE_2WS,
-  STATE_4WS,
-  STATE_CRAB,
-  NO
-} controll_state;
-
 RingBuffer<float> *PTR_RFront;
 RingBuffer<float> *PTR_RBack;
-
-short task;
-
-//-------------------------------------------------------------------------------------------------
-//-----------------------------------functions-----------------------------------------------------
-//-------------------------------------------------------------------------------------------------
-
-float fmap(float x, float in_min, float in_max, float out_min, float out_max)
-{
-  float result = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-  result > 255 ? result = 255 : 0;
-  result < 0 ? result = 0 : 0;
-  return result;
-}
-
-short getTask(short persent)
-{
-  persent = persent > 100 ? 100 : persent;
-  persent = persent < 0 ? 0 : persent;
-
-  short task = 255.f * (float)persent / 100.f;
-  return task;
-}
 
 //обновляем значение рычага режимов каждые 200мс
 void updateChannel()
@@ -46,13 +15,6 @@ void updateChannel()
     bool Mode_2ws = digitalRead(DI_MODE_2WS),
          Mode_4ws = digitalRead(DI_MODE_4WS),
          Mode_crab = digitalRead(DI_MODE_CRAB);
-
-    // Serial.print( Mode_2ws );
-    // Serial.print("\t");
-    // Serial.print( Mode_4ws );
-    // Serial.print("\t");
-    // Serial.print( Mode_crab );
-    // Serial.print("\n");
 
     if (((Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0) && controll_state != Controll_state::NO)
     {
@@ -77,11 +39,9 @@ void updateChannel()
 
 void setup()
 {
+
   PTR_RFront = new RingBuffer<float>();
   PTR_RBack = new RingBuffer<float>();
-
-  pinMode(PIN_PTR_RFront, INPUT_PULLUP);
-  pinMode(PIN_PTR_RBack, INPUT_PULLUP);
 
   pinMode(PIN_PTR_RFront, INPUT_PULLUP);
   pinMode(PIN_PTR_RBack, INPUT_PULLUP);
@@ -97,8 +57,7 @@ void setup()
   pinMode(PIN_DRIVER_POWER_CH2, OUTPUT);
 
   //set init value of power equal 50%
-  analogWrite(PIN_DRIVER_POWER_CH1, getTask(zeroValuePWM));
-  analogWrite(PIN_DRIVER_POWER_CH2, getTask(zeroValuePWM));
+  setTask(recalcTask(zeroRBack), "SETUP");
 
   pinMode(DI_MODE_2WS, INPUT);
   pinMode(DI_MODE_4WS, INPUT);
@@ -106,11 +65,12 @@ void setup()
   controll_state = Controll_state::NO;
 
   Serial.begin(115200);
+  Serial.println("Programm STARTED!");
 }
 
-//-------------------------------------------------------------------------------------------------
-//-----------------------------------MAIN FUNCTION-------------------------------------------------
-//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------
+//-----------------------------------MAIN FUNCTION-------------------------------------------
+//-------------------------------------------------------------------------------------------
 void loop()
 {
   updateChannel();
@@ -124,105 +84,52 @@ void loop()
     time_to_update_PTRs = millis();
   }
 
-  /*--------------------------------------------------------------------------------------------------
+  /*-------------------------------------------------------------------------------------
     BUISNESS LOGIC
       analogRead values go from 0 to 1023, analogWrite values from 0 to 255
-  --------------------------------------------------------------------------------------------------*/
-
-  if (millis() - time_to_update_logic > 150)
+  -------------------------------------------------------------------------------------*/
+  if (millis() - time_to_update_logic > 1500)
   {
     long delta = 0;
     short sign = 1;
     float sourceVal = PTR_RFront->getAverage() / 1023.f * 100,
-            ctrlVal = PTR_RBack->getAverage() / 1023.f * 100;
-
-    switch (controll_state)    {
-
-      case Controll_state::STATE_2WS:
-        delta = ctrlVal - zeroRBack;
-        if (delta > 0)
-          sign = -1;
-
-        if (abs(delta) < 5)
-        {
-          task = zeroValuePWM;
-          break;
-        }
-        else if (abs(delta) < 20)
-          task = getTask( zeroValuePWM + 12.5 * sign );
-        else if (abs(delta) > 20)
-          task = getTask( zeroValuePWM + 25 * sign );
-
-        analogWrite(PIN_DRIVER_POWER_CH1, task);
-        analogWrite(PIN_DRIVER_POWER_CH2, task);
-        break;
-
-      case Controll_state::STATE_4WS:
-        //code
-        task = getTask(zeroValuePWM);
-        task = task > getTask(maxValuePWM) ? getTask(maxValuePWM) : task;
-        task = task < getTask(minValuePWM) ? getTask(minValuePWM) : task;
-        analogWrite(PIN_DRIVER_POWER_CH1, task);
-        analogWrite(PIN_DRIVER_POWER_CH2, task);
-        break;
-
-      case Controll_state::STATE_CRAB:
-        //code
-        task = getTask(zeroValuePWM);
-        task = task > getTask(maxValuePWM) ? getTask(maxValuePWM) : task;
-        task = task < getTask(minValuePWM) ? getTask(minValuePWM) : task;
-        analogWrite(PIN_DRIVER_POWER_CH1, task);
-        analogWrite(PIN_DRIVER_POWER_CH2, task);
-        break;
-
-      case Controll_state::NO:
-        //TODO: Discuss behaviour in this case
-        break;
-
-      default:
-        break;
-    }
-
-    time_to_update_logic = millis();
-  }
-
-#ifdef monitor
-  if (millis() - time_to_print > 40)
-  {
-    Serial.print("RFront(%):\tRBack(%):\tMode:\n");
-    Serial.print(PTR_RFront->getAverage() / 1023.f * 100.f);
-    Serial.print("\t");
-    Serial.print(PTR_RBack->getAverage()  / 1023.f * 100.f);
-    Serial.print("\t");
-
+          ctrlVal = PTR_RBack->getAverage() / 1023.f * 100;
+    String message2;
     switch (controll_state)
     {
+
+    /*Режим выравнивания задних колёс
+                                         zeroRBack                ctrlVal
+        задача уменьшить разницу между нулевой точкой и значениями потенциометра
+    */
     case Controll_state::STATE_2WS:
-      Serial.print(10);
-      Serial.print("\t");
+      PROGRAMM_2WS_sh(sourceVal, ctrlVal);
       break;
 
+    /*Режим обратного дублирования передних колёс
+                                      sourceVal                             ctrlVal
+        задача уменьшить разницу между рулём и значениями потенциометра задних колёс со знаком минус
+    */
     case Controll_state::STATE_4WS:
-      Serial.print(20);
-      Serial.print("\t");
+      PROGRAMM_4WS_sh(sourceVal, ctrlVal);
       break;
 
     case Controll_state::STATE_CRAB:
-      Serial.print(30);
-      Serial.print("\t");
+      PROGRAMM_CRAB_sh(sourceVal, ctrlVal);
       break;
 
     case Controll_state::NO:
-      Serial.print(0);
-      Serial.print("\t");
-      Serial.print("No one mode used! Check Cabel");
+      //TODO: Discuss behaviour in this case
       break;
 
     default:
       break;
     }
 
-    time_to_print = millis();
-  }
+    time_to_update_logic = millis();
+
+#ifdef monitor
+    BIG_BRO
 #endif
+  }
 }
