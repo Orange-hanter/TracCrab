@@ -5,8 +5,8 @@
 #define BIG_BRO                                                                            \
   if (millis() - time_to_print > 500)                                                      \
   {                                                                                        \
-    String message = "\t\tRFront(%):" + String(PTR_RFront->getAverage() / 1023.f * 100.f); \
-    message += "\t\t RBack(%):" + String(PTR_RBack->getAverage() / 1023.f * 100.f);        \
+    String message = "\t RFront(%):" + String(PTR_RFront->getAverage() / 1023.f * 100.f); \
+    message += "\t  RBack(%):" + String(PTR_RBack->getAverage() / 1023.f * 100.f);        \
     message += "\t Mode: ";                                                                \
     Serial.print(message);                                                                 \
     switch (controll_state)                                                                \
@@ -45,6 +45,126 @@ float fmap(float x, float in_min, float in_max, float out_min, float out_max)
   return result;
 }
 
+short recalcTask_shift(short shift)
+{
+  if (task_2 == -1 || shift == 0)
+  {
+    task_2 = zeroRBack;
+    return task_2;
+  }
+
+  task_2 += shift;
+  task_2 = task_K_a * task_2 + task_K_b;
+  
+  task_2 = task_2 > maxValuePWM ? maxValuePWM : task_2;
+  task_2 = task_2 < minValuePWM ? minValuePWM : task_2;
+  
+  return task_2;
+}
+
+void setTask(short task_to_set, String source = "")
+{
+#ifdef task_monitor
+  if (source != "")
+    Serial.println("Commant to change task send " + source);
+#endif
+  if (task_to_set > 255 || task_to_set < 0)
+  {
+    // TODO: good place for error indication
+    Serial.println("");
+    Serial.print("ERROR: NOT CORRECT VALUE FOR TASK");
+    Serial.println("");
+  }
+  
+  int recalced = 255.f * (float)task_to_set / 100.f;
+  analogWrite(PIN_DRIVER_POWER_CH1, recalced);
+  //analogWrite(PIN_DRIVER_POWER_CH2, task_to_set); // commented becouce of seckond channel used like power supply
+}
+
+void PROGRAMM_2WS_sh(float sourceVal, float ctrlVal)
+{
+  String message2;
+  short sign = 1;
+  long delta = ctrlVal - zeroRBack;
+  message2 = "\t Delta:" + String(delta);
+  // в зависимости от знака будет меняться направление
+  // больше нуля = право
+  // меньше нуля = влево
+  if (delta < 0)
+    sign = -1;
+  delta = abs(delta);
+  if (delta <= 5)
+    task = recalcTask_shift(0);
+  else if (delta < 15)
+    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
+  else if (delta <= 20)
+    task = recalcTask_shift(5 * sign);
+  else if (delta > 20)
+    task = recalcTask_shift(10 * sign);
+
+  message2 += "\t Task:" + String(task);
+  Serial.print(message2);
+
+  setTask(task, "2WS");
+}
+
+void PROGRAMM_4WS_sh(float sourceVal, float ctrlVal)
+{
+  String message2;
+  short sign = 1;
+  long delta = (zeroRFront - sourceVal) + (zeroRBack - ctrlVal);
+  message2 = "\t Delta:" + String(delta);
+  // в зависимости от знака будет меняться направление
+  // больше нуля = право
+  // меньше нуля = влево
+  //if (sourceVal < zeroRFront)
+  if (delta < 0)
+    sign = -1;
+  delta = abs(delta);
+  if (delta <= 5)
+    task = recalcTask_shift(0);
+  else if (delta < 15)
+    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
+  else if (delta <= 20)
+    task = recalcTask_shift(5 * sign);
+  else if (delta > 20)
+    task = recalcTask_shift(10 * sign);
+
+  message2 += "\t Task:" + String(task);
+  Serial.print(message2);
+
+  setTask(task, "4WS");
+}
+
+void PROGRAMM_CRAB_sh(float sourceVal, float ctrlVal)
+{
+  String message2;
+  short sign = 1;
+  long delta = (zeroRFront - sourceVal) - (zeroRBack - ctrlVal);
+  message2 = "\t Delta:" + String(delta);
+  // в зависимости от знака будет меняться направление
+  // больше нуля = право
+  // меньше нуля = влево
+  if (delta > 0)
+    sign = -1;
+  delta = abs(delta);
+  if (delta <= 5)
+    task = recalcTask_shift(0);
+  else if (delta < 15)
+    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
+  else if (delta <= 20)
+    task = recalcTask_shift(5 * sign);
+  else if (delta > 20)
+    task = recalcTask_shift(10 * sign);
+
+  message2 += "\t Task:" + String(task);
+  Serial.print(message2);
+
+  setTask(task, "CRAB");
+}
+
+/*
+
 short recalcTask(short persent)
 // TODO ТУТ ДОЛЖно быть +-6 вольт при 50%
 {
@@ -56,36 +176,6 @@ short recalcTask(short persent)
     return 255.f * (float)persent / 100.f;
   }
   return 255.f * (float)zeroRBack / 100.f;
-}
-
-short recalcTask_shift(short shift)
-{
-  if (task_2 == -1)
-  {
-    task_2 = zeroRBack;
-  }
-  if (shift == 0)
-  {
-    task_2 = zeroRBack;
-    return 255.f * zeroRBack / 100.f;
-  }
-
-  task_2 += shift;
-
-  task_2 = task_2 > maxValuePWM ? maxValuePWM : task_2;
-  task_2 = task_2 < minValuePWM ? minValuePWM : task_2;
-
-  return 255.f * (float)task_2 / 100.f;
-}
-
-void setTask(short task_to_set, String source = "")
-{
-#ifdef task_monitor
-  if (source != "")
-    Serial.println("Commant to change task send " + source);
-#endif
-  analogWrite(PIN_DRIVER_POWER_CH1, task_to_set);
-  //analogWrite(PIN_DRIVER_POWER_CH2, task_to_set);
 }
 
 void PROGRAMM_2WS(float sourceVal, float ctrlVal)
@@ -114,84 +204,4 @@ void PROGRAMM_2WS(float sourceVal, float ctrlVal)
 
   setTask(task, "2WS");
 }
-
-void PROGRAMM_2WS_sh(float sourceVal, float ctrlVal)
-{
-  String message2;
-  short sign = 1;
-  long delta = ctrlVal - zeroRBack;
-  message2 = "\tDelta:" + String(delta);
-  // в зависимости от знака будет меняться направление
-  // больше нуля = право
-  // меньше нуля = влево
-  if (delta < 0)
-    sign = -1;
-  delta = abs(delta);
-  if (delta <= 5)
-    task = recalcTask_shift(0);
-  else if (delta < 15)
-    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
-  else if (delta < 20)
-    task = recalcTask_shift(5 * sign);
-  else if (delta > 20)
-    task = recalcTask_shift(10 * sign);
-
-  message2 += "\t\tTask:" + String(task);
-  Serial.print(message2);
-
-  setTask(task, "2WS");
-}
-
-void PROGRAMM_4WS_sh(float sourceVal, float ctrlVal)
-{
-  String message2;
-  short sign = 1;
-  long delta = (zeroRFront - sourceVal) + (zeroRBack - ctrlVal);
-  message2 = "\tDelta:" + String(delta);
-  // в зависимости от знака будет меняться направление
-  // больше нуля = право
-  // меньше нуля = влево
-  if (delta > 0)
-    sign = -1;
-  delta = abs(delta);
-  if (delta <= 5)
-    task = recalcTask_shift(0);
-  else if (delta < 15)
-    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
-  else if (delta < 20)
-    task = recalcTask_shift(5 * sign);
-  else if (delta > 20)
-    task = recalcTask_shift(10 * sign);
-
-  message2 += "\t\tTask:" + String(task);
-  Serial.print(message2);
-
-  setTask(task, "4WS");
-}
-
-void PROGRAMM_CRAB_sh(float sourceVal, float ctrlVal)
-{
-  String message2;
-  short sign = 1;
-  long delta = (zeroRFront - sourceVal) - (zeroRBack - ctrlVal);
-  message2 = "\tDelta:" + String(delta);
-  // в зависимости от знака будет меняться направление
-  // больше нуля = право
-  // меньше нуля = влево
-  if (delta < 0)
-    sign = -1;
-  delta = abs(delta);
-  if (delta <= 5)
-    task = recalcTask_shift(0);
-  else if (delta < 15)
-    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
-  else if (delta < 20)
-    task = recalcTask_shift(5 * sign);
-  else if (delta > 20)
-    task = recalcTask_shift(10 * sign);
-
-  message2 += "\t\tTask:" + String(task);
-  Serial.print(message2);
-
-  setTask(task, "CRAB");
-}
+*/
