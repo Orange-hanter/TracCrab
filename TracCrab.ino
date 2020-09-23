@@ -63,7 +63,7 @@ void setup()
 #endif BOOST_PWM
 
   //set init value of power equal 50%
-  setTask(recalcTask(zeroRBack), "SETUP");
+  setTask(recalcTask_shift(0), "SETUP");
   analogWrite(PIN_DRIVER_POWER_CH2, 255); //канал 2 на полную мощность!!!
 
   pinMode(DI_MODE_2WS, INPUT);

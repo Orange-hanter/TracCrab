@@ -61,3 +61,6 @@ const float voltageMultiplyer = 5.0 / 1023.0;
 
 int task;
 static int task_2 = -1;
+
+const int task_K_a = 1;
+const int task_K_b = 0;
