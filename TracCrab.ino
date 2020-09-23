@@ -56,8 +56,15 @@ void setup()
   pinMode(PIN_DRIVER_POWER_CH1, OUTPUT);
   pinMode(PIN_DRIVER_POWER_CH2, OUTPUT);
 
+#ifdef BOOST_PWM
+  //чёрная магия разгона ардуино до 
+  TCCR1A = TCCR1A & 0xe0 | 1;
+  TCCR1B = TCCR1B & 0xe0 | 0x09; 
+#endif BOOST_PWM
+
   //set init value of power equal 50%
   setTask(recalcTask(zeroRBack), "SETUP");
+  analogWrite(PIN_DRIVER_POWER_CH2, 255); //канал 2 на полную мощность!!!
 
   pinMode(DI_MODE_2WS, INPUT);
   pinMode(DI_MODE_4WS, INPUT);
@@ -65,6 +72,9 @@ void setup()
   controll_state = Controll_state::NO;
 
   Serial.begin(115200);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
   Serial.println("Programm STARTED!");
 }
 

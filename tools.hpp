@@ -85,7 +85,7 @@ void setTask(short task_to_set, String source = "")
     Serial.println("Commant to change task send " + source);
 #endif
   analogWrite(PIN_DRIVER_POWER_CH1, task_to_set);
-  analogWrite(PIN_DRIVER_POWER_CH2, task_to_set);
+  //analogWrite(PIN_DRIVER_POWER_CH2, task_to_set);
 }
 
 void PROGRAMM_2WS(float sourceVal, float ctrlVal)
@@ -151,7 +151,7 @@ void PROGRAMM_4WS_sh(float sourceVal, float ctrlVal)
   // в зависимости от знака будет меняться направление
   // больше нуля = право
   // меньше нуля = влево
-  if (sourceVal < zeroRFront)
+  if (delta > 0)
     sign = -1;
   delta = abs(delta);
   if (delta <= 5)
