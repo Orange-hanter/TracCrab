@@ -59,8 +59,11 @@ public:
     Serial.println();*/
   }
 
+  //TODO: поменять функцию getAverage (сделать вывод кешированного значения)
+
   T getAverage()
   {
+    //TODO: добавить прерывание которое будет вызываться с постоянной переодичностью
     float summ{0};
     for (size_t i = 0; i < SAMPLES; ++i)
       summ += data[i];

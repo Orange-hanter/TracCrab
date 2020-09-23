@@ -50,6 +50,7 @@ volatile long time_to_print = 0;
 volatile long time_to_update_PTRs = 0;
 volatile long time_to_update_channel = 0;
 volatile long time_to_update_logic = 0;
+volatile long time_to_update_PWM = 0;
 
 const float maxValuePWM = 60; // maximum of output PWM power
 const float minValuePWM = 17; // minimum
@@ -60,7 +61,12 @@ const float zeroRBack = 39;
 const float voltageMultiplyer = 5.0 / 1023.0;
 
 int task;
+float delta;
 static int task_2 = -1;
 
 const int task_K_a = 1;
 const int task_K_b = 0;
+
+#define task_monitor    false
+#define monitor         true        //turn on monitoring via USB
+#define BOOST_PWM       false

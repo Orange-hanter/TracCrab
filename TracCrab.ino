@@ -2,40 +2,15 @@
 #include "RingBuffer.hpp"
 #include "tools.hpp"
 
-#define monitor //turn on monitoring via USB
 
 RingBuffer<float> *PTR_RFront;
 RingBuffer<float> *PTR_RBack;
 
-//обновляем значение рычага режимов каждые 200мс
-void updateChannel()
-{
-  if (millis() - time_to_update_channel > 200)
-  {
-    bool Mode_2ws = digitalRead(DI_MODE_2WS),
-         Mode_4ws = digitalRead(DI_MODE_4WS),
-         Mode_crab = digitalRead(DI_MODE_CRAB);
 
-    if (((Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0) && controll_state != Controll_state::NO)
-    {
-      controll_state = Controll_state::NO;
-    }
-    else if (!Mode_2ws && Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_2WS)
-    {
-      controll_state = Controll_state::STATE_2WS;
-    }
-    else if (Mode_2ws && !Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_4WS)
-    {
-      controll_state = Controll_state::STATE_4WS;
-    }
-    else if (Mode_2ws && Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_CRAB)
-    {
-      controll_state = Controll_state::STATE_CRAB;
-    }
+//обновляем значение рычага режимов каждые 300мс
+void updateChannel();
 
-    time_to_update_channel = millis();
-  }
-}
+void printDebugInfo();
 
 void setup()
 {
@@ -56,11 +31,11 @@ void setup()
   pinMode(PIN_DRIVER_POWER_CH1, OUTPUT);
   pinMode(PIN_DRIVER_POWER_CH2, OUTPUT);
 
-#ifdef BOOST_PWM
+#if BOOST_PWM
   //чёрная магия разгона ардуино до 
   TCCR1A = TCCR1A & 0xe0 | 1;
   TCCR1B = TCCR1B & 0xe0 | 0x09; 
-#endif BOOST_PWM
+#endif
 
   //set init value of power equal 50%
   setTask(recalcTask_shift(0), "SETUP");
@@ -85,8 +60,8 @@ void loop()
 {
   updateChannel();
 
-  //обновляем значение на потенциометрах каждые 50мс
-  if (millis() - time_to_update_PTRs > 50)
+  //обновляем значение на потенциометрах каждые 5мс
+  if (millis() - time_to_update_PTRs > 5)
   {
     PTR_RFront->update(analogRead(PIN_PTR_RFront));
     PTR_RBack->update(analogRead(PIN_PTR_RBack));
@@ -98,13 +73,10 @@ void loop()
     BUISNESS LOGIC
       analogRead values go from 0 to 1023, analogWrite values from 0 to 255
   -------------------------------------------------------------------------------------*/
-  if (millis() - time_to_update_logic > 1500)
+  if (millis() - time_to_update_logic > 20)
   {
-    long delta = 0;
-    short sign = 1;
     float sourceVal = PTR_RFront->getAverage() / 1023.f * 100,
           ctrlVal = PTR_RBack->getAverage() / 1023.f * 100;
-    String message2;
     switch (controll_state)
     {
 
@@ -137,9 +109,69 @@ void loop()
     }
 
     time_to_update_logic = millis();
+  }
 
-#ifdef monitor
-    BIG_BRO
-#endif
+  printDebugInfo();
+}
+
+void updateChannel()
+{
+  if (millis() - time_to_update_channel > 300)
+  {
+    bool Mode_2ws = digitalRead(DI_MODE_2WS),
+         Mode_4ws = digitalRead(DI_MODE_4WS),
+         Mode_crab = digitalRead(DI_MODE_CRAB);
+
+    if (((Mode_2ws + Mode_4ws + Mode_crab) == 3 || (Mode_2ws + Mode_4ws + Mode_crab) == 0) && controll_state != Controll_state::NO)
+    {
+      controll_state = Controll_state::NO;
+    }
+    else if (!Mode_2ws && Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_2WS)
+    {
+      controll_state = Controll_state::STATE_2WS;
+    }
+    else if (Mode_2ws && !Mode_4ws && Mode_crab && controll_state != Controll_state::STATE_4WS)
+    {
+      controll_state = Controll_state::STATE_4WS;
+    }
+    else if (Mode_2ws && Mode_4ws && !Mode_crab && controll_state != Controll_state::STATE_CRAB)
+    {
+      controll_state = Controll_state::STATE_CRAB;
+    }
+
+    time_to_update_channel = millis();
+  }
+}
+
+void printDebugInfo()
+{
+
+  if (millis() - time_to_print > 333)
+  {
+    String message = "RFront(%):" + String(PTR_RFront->getAverage() / 1023.f * 100.f);
+    message += "\t  RBack(%):" + String(PTR_RBack->getAverage() / 1023.f * 100.f);
+    message = "\t Delta:" + String(delta);
+    message += "\t Task:" + String(task);
+    message += "\t Mode: ";
+
+    Serial.print(message);
+    switch (controll_state)
+    {
+    case Controll_state::STATE_2WS:
+      Serial.println(String("2ws"));
+      break;
+    case Controll_state::STATE_4WS:
+      Serial.println(String("4ws"));
+      break;
+    case Controll_state::STATE_CRAB:
+      Serial.println(String("CRAB"));
+      break;
+    case Controll_state::NO:
+      Serial.println("No one mode used! Check Cabel");
+      break;
+    default:
+      break;
+    }
+    time_to_print = millis();
   }
 }

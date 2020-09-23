@@ -1,34 +1,5 @@
 #include "config.h"
 
-#define task_monitor3
-
-#define BIG_BRO                                                                            \
-  if (millis() - time_to_print > 500)                                                      \
-  {                                                                                        \
-    String message = "\t RFront(%):" + String(PTR_RFront->getAverage() / 1023.f * 100.f); \
-    message += "\t  RBack(%):" + String(PTR_RBack->getAverage() / 1023.f * 100.f);        \
-    message += "\t Mode: ";                                                                \
-    Serial.print(message);                                                                 \
-    switch (controll_state)                                                                \
-    {                                                                                      \
-    case Controll_state::STATE_2WS:                                                        \
-      Serial.println(String("2ws"));                                                       \
-      break;                                                                               \
-    case Controll_state::STATE_4WS:                                                        \
-      Serial.println(String("4ws"));                                                       \
-      break;                                                                               \
-    case Controll_state::STATE_CRAB:                                                       \
-      Serial.println(String("CRAB"));                                                      \
-      break;                                                                               \
-    case Controll_state::NO:                                                               \
-      Serial.println("No one mode used! Check Cabel");                                     \
-      break;                                                                               \
-    default:                                                                               \
-      break;                                                                               \
-    }                                                                                      \
-    time_to_print = millis();                                                              \
-  }
-
 enum Controll_state
 {
   STATE_2WS,
@@ -55,16 +26,36 @@ short recalcTask_shift(short shift)
 
   task_2 += shift;
   task_2 = task_K_a * task_2 + task_K_b;
-  
+
   task_2 = task_2 > maxValuePWM ? maxValuePWM : task_2;
   task_2 = task_2 < minValuePWM ? minValuePWM : task_2;
-  
+
   return task_2;
+}
+
+// в зависимости от знака будет меняться направление
+// больше нуля = право
+// меньше нуля = влево
+void updateTask(short sign = 1)
+{
+  if (millis() - time_to_print > 200)
+  {
+    delta = abs(delta);
+    if (delta <= 5)
+      task = recalcTask_shift(0);
+    else if (delta < 15)
+      task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
+    else if (delta <= 20)
+      task = recalcTask_shift(5 * sign);
+    else if (delta > 20)
+      task = recalcTask_shift(10 * sign);
+    time_to_print = millis();
+  }
 }
 
 void setTask(short task_to_set, String source = "")
 {
-#ifdef task_monitor
+#if task_monitor
   if (source != "")
     Serial.println("Commant to change task send " + source);
 #endif
@@ -75,7 +66,7 @@ void setTask(short task_to_set, String source = "")
     Serial.print("ERROR: NOT CORRECT VALUE FOR TASK");
     Serial.println("");
   }
-  
+
   int recalced = 255.f * (float)task_to_set / 100.f;
   analogWrite(PIN_DRIVER_POWER_CH1, recalced);
   //analogWrite(PIN_DRIVER_POWER_CH2, task_to_set); // commented becouce of seckond channel used like power supply
@@ -83,82 +74,26 @@ void setTask(short task_to_set, String source = "")
 
 void PROGRAMM_2WS_sh(float sourceVal, float ctrlVal)
 {
-  String message2;
-  short sign = 1;
-  long delta = ctrlVal - zeroRBack;
-  message2 = "\t Delta:" + String(delta);
-  // в зависимости от знака будет меняться направление
-  // больше нуля = право
-  // меньше нуля = влево
-  if (delta < 0)
-    sign = -1;
-  delta = abs(delta);
-  if (delta <= 5)
-    task = recalcTask_shift(0);
-  else if (delta < 15)
-    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
-  else if (delta <= 20)
-    task = recalcTask_shift(5 * sign);
-  else if (delta > 20)
-    task = recalcTask_shift(10 * sign);
 
-  message2 += "\t Task:" + String(task);
-  Serial.print(message2);
+  delta = ctrlVal - zeroRBack;
+  delta > 0 ? updateTask(-1) : updateTask();
 
   setTask(task, "2WS");
 }
 
 void PROGRAMM_4WS_sh(float sourceVal, float ctrlVal)
 {
-  String message2;
-  short sign = 1;
-  long delta = (zeroRFront - sourceVal) + (zeroRBack - ctrlVal);
-  message2 = "\t Delta:" + String(delta);
-  // в зависимости от знака будет меняться направление
-  // больше нуля = право
-  // меньше нуля = влево
   //if (sourceVal < zeroRFront)
-  if (delta < 0)
-    sign = -1;
-  delta = abs(delta);
-  if (delta <= 5)
-    task = recalcTask_shift(0);
-  else if (delta < 15)
-    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
-  else if (delta <= 20)
-    task = recalcTask_shift(5 * sign);
-  else if (delta > 20)
-    task = recalcTask_shift(10 * sign);
-
-  message2 += "\t Task:" + String(task);
-  Serial.print(message2);
+  delta = (zeroRFront - sourceVal) + (zeroRBack - ctrlVal);
+  delta < 0 ? updateTask(-1) : updateTask();
 
   setTask(task, "4WS");
 }
 
 void PROGRAMM_CRAB_sh(float sourceVal, float ctrlVal)
 {
-  String message2;
-  short sign = 1;
-  long delta = (zeroRFront - sourceVal) - (zeroRBack - ctrlVal);
-  message2 = "\t Delta:" + String(delta);
-  // в зависимости от знака будет меняться направление
-  // больше нуля = право
-  // меньше нуля = влево
-  if (delta > 0)
-    sign = -1;
-  delta = abs(delta);
-  if (delta <= 5)
-    task = recalcTask_shift(0);
-  else if (delta < 15)
-    task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
-  else if (delta <= 20)
-    task = recalcTask_shift(5 * sign);
-  else if (delta > 20)
-    task = recalcTask_shift(10 * sign);
-
-  message2 += "\t Task:" + String(task);
-  Serial.print(message2);
+  delta = (zeroRFront - sourceVal) - (zeroRBack - ctrlVal);
+  delta > 0 ? updateTask(-1) : updateTask();
 
   setTask(task, "CRAB");
 }
