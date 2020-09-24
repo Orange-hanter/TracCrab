@@ -38,18 +38,19 @@ short recalcTask_shift(short shift)
 // меньше нуля = влево
 void updateTask(short sign = 1)
 {
-  if (millis() - time_to_print > 200)
-  {
-    delta = abs(delta);
+  if (millis() - time_to_update_PWM > 200)
+  {    
+    float _delta = abs(delta);
     if (delta <= 5)
       task = recalcTask_shift(0);
-    else if (delta < 15)
+    else if (_delta < 15)
       task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
-    else if (delta <= 20)
-      task = recalcTask_shift(5 * sign);
-    else if (delta > 20)
-      task = recalcTask_shift(10 * sign);
-    time_to_print = millis();
+    else if (_delta <= 20)
+      task = recalcTask_shift(4 * sign);
+    else
+      task = recalcTask_shift(6 * sign);
+
+    time_to_update_PWM = millis();
   }
 }
 
@@ -74,7 +75,6 @@ void setTask(short task_to_set, String source = "")
 
 void PROGRAMM_2WS_sh(float sourceVal, float ctrlVal)
 {
-
   delta = ctrlVal - zeroRBack;
   delta > 0 ? updateTask(-1) : updateTask();
 
@@ -85,6 +85,8 @@ void PROGRAMM_4WS_sh(float sourceVal, float ctrlVal)
 {
   //if (sourceVal < zeroRFront)
   delta = (zeroRFront - sourceVal) + (zeroRBack - ctrlVal);
+  delta = ctrlVal > maxValueRBack ? 0 : delta;
+  delta = ctrlVal < minValueRBack ? 0 : delta;
   delta < 0 ? updateTask(-1) : updateTask();
 
   setTask(task, "4WS");
@@ -93,6 +95,8 @@ void PROGRAMM_4WS_sh(float sourceVal, float ctrlVal)
 void PROGRAMM_CRAB_sh(float sourceVal, float ctrlVal)
 {
   delta = (zeroRFront - sourceVal) - (zeroRBack - ctrlVal);
+  delta = ctrlVal > maxValueRBack ? 0 : delta;
+  delta = ctrlVal < minValueRBack ? 0 : delta;
   delta > 0 ? updateTask(-1) : updateTask();
 
   setTask(task, "CRAB");

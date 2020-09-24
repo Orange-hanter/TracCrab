@@ -55,6 +55,9 @@ volatile long time_to_update_PWM = 0;
 const float maxValuePWM = 60; // maximum of output PWM power
 const float minValuePWM = 17; // minimum
 
+const float maxValueRBack = 90;
+const float minValueRBack = 26;
+
 const float zeroRFront = 50; // zero point of potentiometer in persent
 const float zeroRBack = 39;
 
@@ -70,3 +73,7 @@ const int task_K_b = 0;
 #define task_monitor    false
 #define monitor         true        //turn on monitoring via USB
 #define BOOST_PWM       false
+
+const char lebel_debug[] = "[\u001b[33mDEBUG\u001b[0m]: ";
+static const char  lebel_info[] = "[\u001b[32mINFO \u001b[0m]: ";
+static const char  lebel_warn[] = "[\u001b[31mWARN \u001b[0m]: ";

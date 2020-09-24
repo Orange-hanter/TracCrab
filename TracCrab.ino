@@ -76,7 +76,7 @@ void loop()
   if (millis() - time_to_update_logic > 20)
   {
     float sourceVal = PTR_RFront->getAverage() / 1023.f * 100,
-          ctrlVal = PTR_RBack->getAverage() / 1023.f * 100;
+          ctrlVal = PTR_RBack->getAverage() / 1023.f * 100;  
     switch (controll_state)
     {
 
@@ -150,7 +150,7 @@ void printDebugInfo()
   {
     String message = "RFront(%):" + String(PTR_RFront->getAverage() / 1023.f * 100.f);
     message += "\t  RBack(%):" + String(PTR_RBack->getAverage() / 1023.f * 100.f);
-    message = "\t Delta:" + String(delta);
+    message += "\t Delta:" + String(delta);
     message += "\t Task:" + String(task);
     message += "\t Mode: ";
 
