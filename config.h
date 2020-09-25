@@ -58,8 +58,8 @@ const float minValuePWM = 17; // minimum
 const float maxValueRBack = 90;
 const float minValueRBack = 26;
 
-const float zeroRFront = 50; // zero point of potentiometer in persent
-const float zeroRBack = 39;
+const float zeroRFront = 45.5; // zero point of potentiometer in persent
+const float zeroRBack = 38.5;
 
 const float voltageMultiplyer = 5.0 / 1023.0;
 

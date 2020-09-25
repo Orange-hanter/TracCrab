@@ -38,13 +38,14 @@ short recalcTask_shift(short shift)
 // меньше нуля = влево
 void updateTask(short sign = 1)
 {
+  float _delta = abs(delta);
+  if (delta <= 1)
+    task = recalcTask_shift(0);
+  
   if (millis() - time_to_update_PWM > 200)
-  {    
-    float _delta = abs(delta);
-    if (delta <= 5)
-      task = recalcTask_shift(0);
-    else if (_delta < 15)
-      task = recalcTask_shift(2 * sign); // как вариант добавить больше точек
+  { 
+    if (_delta < 15)
+      task = recalcTask_shift(3 * sign); // как вариант добавить больше точек
     else if (_delta <= 20)
       task = recalcTask_shift(4 * sign);
     else
