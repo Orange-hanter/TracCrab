@@ -55,7 +55,7 @@ volatile long time_to_update_PWM = 0;
 const float maxValuePWM = 60; // maximum of output PWM power
 const float minValuePWM = 17; // minimum
 
-const float maxValueRBack = 90;
+const float maxValueRBack = 100;
 const float minValueRBack = 26;
 
 const float zeroRFront = 45.5; // zero point of potentiometer in persent

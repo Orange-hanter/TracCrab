@@ -39,7 +39,7 @@ short recalcTask_shift(short shift)
 void updateTask(short sign = 1)
 {
   float _delta = abs(delta);
-  if (delta <= 1)
+  if (_delta <= 1)
     task = recalcTask_shift(0);
   
   if (millis() - time_to_update_PWM > 200)
